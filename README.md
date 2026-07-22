@@ -53,6 +53,11 @@ journal, pour déclencher vos automatisations :
 | `menu_item_consumed` | `label`, `menuItemId` | une récompense à la carte est utilisée |
 | `cheer_sent` | `cheer` (`bravo`/`super`/`seen`) | un parent envoie un bravo |
 
+Attention à la distinction entre les deux formes de récompense : une
+récompense **en temps** lancée dans l'app émet `session_started` (avec
+`minutes`), une récompense **à la carte** du menu (« Soirée film ») émet
+`menu_item_consumed` (avec `label`).
+
 Tous portent aussi `id`, `at`, `day`, `childId` et `childName` (le prénom,
 pratique pour les annonces : `{{ trigger.event.data.childName }}`). Les `label`
 sont les libellés choisis par la famille. Les id des items créés dans l'app
