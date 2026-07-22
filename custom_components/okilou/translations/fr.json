@@ -1,0 +1,41 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connecter Okilou",
+        "description": "Crée un jeton de foyer dans l'app Okilou : Réglages → Ton foyer → API & domotique. Le jeton est en lecture seule et révocable à tout moment depuis l'app.",
+        "data": {
+          "token": "Jeton du foyer (rf_api_…)",
+          "base_url": "URL de l'API"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Reconnecter Okilou",
+        "description": "Le jeton a été révoqué ou n'est plus valide. Crée-en un nouveau dans l'app Okilou (Réglages → Ton foyer → API & domotique) et colle-le ici.",
+        "data": {
+          "token": "Nouveau jeton du foyer (rf_api_…)"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Jeton inconnu ou révoqué",
+      "cannot_connect": "Impossible de joindre l'API Okilou"
+    },
+    "abort": {
+      "already_configured": "Ce jeton est déjà configuré",
+      "reauth_successful": "Nouveau jeton enregistré"
+    }
+  },
+  "entity": {
+    "sensor": {
+      "minutes_remaining": { "name": "Minutes de récompense restantes" },
+      "points": { "name": "Points du jour" },
+      "streak": { "name": "Série de jours réussis" },
+      "session_end": { "name": "Fin de la session" }
+    },
+    "binary_sensor": {
+      "session": { "name": "Session de récompense" },
+      "my_day": { "name": "À la maison aujourd'hui" }
+    }
+  }
+}

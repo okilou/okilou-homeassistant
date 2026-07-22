@@ -1,0 +1,264 @@
+# Spec OpenAPI de l'API publique Okilou v1. Servie sur okilou.fr/api/openapi.yaml
+# et publiée dans le repo okilou/okilou-homeassistant.
+openapi: 3.1.0
+info:
+  title: Okilou API v1
+  version: "1.0"
+  description: |
+    API publique **en lecture seule** d'Okilou (https://okilou.fr). Un jeton
+    couvre **le foyer** (tous ses enfants), se crée dans l'app (Réglages →
+    Ton foyer → API & domotique) et se révoque à tout moment.
+
+    L'API n'expose que ce que le parent voit déjà dans l'app, rien de plus.
+
+    **Garde alternée (mode indépendant)** : le jeton d'un foyer ne sert que
+    les journées de ce foyer. Le jour de l'autre maison, `/today` répond
+    calmement `{ date, isMyDay: false }`, jamais un 403, jamais les données
+    de l'autre foyer.
+
+    **Latence** : l'app synchronise en 4 s (push) / 60 s (pull), un fait
+    apparaît sur l'API dans les 30 à 60 s. **Rate-limit** : 30 requêtes/min
+    par jeton.
+  contact:
+    name: Okilou
+    url: https://okilou.fr/api/
+servers:
+  - url: https://api.okilou.com/functions/v1/api
+    description: Production
+  - url: https://wpicwejpjrpmjkprttmd.supabase.co/functions/v1/api
+    description: Production (URL d'origine, toujours valable)
+security:
+  - bearerAuth: []
+paths:
+  /children:
+    get:
+      operationId: listChildren
+      summary: Les enfants couverts par le jeton (le foyer)
+      responses:
+        "200":
+          description: Liste des enfants.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Child"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+  /children/{childId}/today:
+    get:
+      operationId: getToday
+      summary: L'état du jour calculé par le moteur (jauge, points, session)
+      parameters:
+        - $ref: "#/components/parameters/childId"
+      responses:
+        "200":
+          description: >
+            État du jour, ou réponse calme `{ date, isMyDay: false }` quand la
+            journée appartient à l'autre foyer (garde alternée indépendante).
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/TodayPayload"
+                  - $ref: "#/components/schemas/CalmDay"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403":
+          description: Enfant hors du cercle du jeton.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "409":
+          description: Pas encore de règles synchronisées pour cet enfant.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+  /children/{childId}/events:
+    get:
+      operationId: listEvents
+      summary: Les faits du journal (déclencheurs d'automatisations)
+      description: |
+        Retourne au plus 100 événements par page, du plus ancien au plus
+        récent. Repasser le `cursor` renvoyé en `since` pour ne recevoir que
+        le nouveau. Le curseur est **composite** (`recorded_at,id`) et opaque :
+        le stocker et le repasser tel quel. Types servis : validations,
+        démarrages de session, récompenses à la carte, bravos.
+      parameters:
+        - $ref: "#/components/parameters/childId"
+        - name: since
+          in: query
+          required: false
+          schema:
+            type: string
+          description: >
+            Le `cursor` de la page précédente (ou un ISO 8601 pour démarrer à
+            un instant donné). Invalide → 400.
+      responses:
+        "200":
+          description: Page d'événements + curseur.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EventsPage" }
+        "400":
+          description: Paramètre `since` mal formé.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403":
+          description: Enfant hors du cercle du jeton.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: "Jeton de foyer `rf_api_` créé dans l'app Okilou."
+  parameters:
+    childId:
+      name: childId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+  responses:
+    Unauthorized:
+      description: Jeton manquant, inconnu ou révoqué.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    RateLimited:
+      description: Trop de requêtes (max 30/min par jeton).
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+  schemas:
+    Error:
+      type: object
+      properties:
+        error: { type: string }
+      required: [error]
+    Child:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        firstName: { type: string }
+      required: [id, firstName]
+    CalmDay:
+      type: object
+      description: Jour de l'autre foyer (garde indépendante), aucune donnée.
+      properties:
+        date: { type: string, format: date }
+        isMyDay: { type: boolean, const: false }
+      required: [date, isMyDay]
+    TodayPayload:
+      type: object
+      properties:
+        date: { type: string, format: date }
+        isMyDay: { type: boolean, const: true }
+        period:
+          type: string
+          enum: [school, holiday, weekend]
+          description: Période effective du jour (zone scolaire du jeton).
+        points: { type: integer }
+        maxPoints: { type: integer }
+        minutesUnlocked: { type: integer, description: "Minutes gagnées (jour ou semaine selon le rythme)." }
+        minutesConsumed: { type: integer }
+        minutesRemaining: { type: integer }
+        consumableToday: { type: boolean, description: "La consommation est-elle permise aujourd'hui ?" }
+        mandatoryOk: { type: boolean, description: "Les essentiels du jour sont-ils faits ?" }
+        perfect: { type: boolean }
+        frozen: { type: boolean }
+        joker: { type: boolean }
+        nextTier:
+          type: [object, "null"]
+          properties:
+            pointsNeeded: { type: integer }
+            unitsGain: { type: integer }
+        behaviors:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: string }
+              label: { type: string, description: "Libellé choisi par la famille (donnée utilisateur, jamais traduite)." }
+              status: { type: string, enum: [todo, declared, validated, rejected] }
+              mandatory: { type: boolean }
+            required: [id, label, status, mandatory]
+        session:
+          type: [object, "null"]
+          description: "Session de récompense. `endsAt` est connue dès le lancement, `minutes` est le cumul des lancements du jour."
+          properties:
+            running: { type: boolean }
+            endsAt: { type: string, format: date-time }
+            minutes: { type: integer }
+        streakDays: { type: integer }
+      required:
+        [date, isMyDay, period, points, maxPoints, minutesUnlocked, minutesConsumed,
+         minutesRemaining, consumableToday, mandatoryOk, perfect, frozen, joker,
+         behaviors, streakDays]
+    EventsPage:
+      type: object
+      properties:
+        events:
+          type: array
+          items: { $ref: "#/components/schemas/ApiEvent" }
+        cursor:
+          type: [string, "null"]
+          description: "À repasser en `since` (opaque, composite `recorded_at,id`)."
+      required: [events, cursor]
+    ApiEvent:
+      oneOf:
+        - $ref: "#/components/schemas/BehaviorValidated"
+        - $ref: "#/components/schemas/SessionStarted"
+        - $ref: "#/components/schemas/MenuItemConsumed"
+        - $ref: "#/components/schemas/CheerSent"
+      discriminator:
+        propertyName: type
+    EventBase:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        at: { type: string, format: date-time, description: "Horodatage serveur (recorded_at)." }
+        day: { type: string, format: date }
+        childId: { type: string, format: uuid }
+      required: [id, at, day, childId]
+    BehaviorValidated:
+      allOf:
+        - $ref: "#/components/schemas/EventBase"
+        - type: object
+          properties:
+            type: { type: string, const: behavior_validated }
+            behaviorId: { type: [string, "null"] }
+            label: { type: [string, "null"] }
+          required: [type]
+    SessionStarted:
+      allOf:
+        - $ref: "#/components/schemas/EventBase"
+        - type: object
+          properties:
+            type: { type: string, const: session_started }
+            minutes: { type: integer, description: "0 si inconnu." }
+          required: [type, minutes]
+    MenuItemConsumed:
+      allOf:
+        - $ref: "#/components/schemas/EventBase"
+        - type: object
+          properties:
+            type: { type: string, const: menu_item_consumed }
+            menuItemId: { type: [string, "null"] }
+            label: { type: [string, "null"] }
+          required: [type]
+    CheerSent:
+      allOf:
+        - $ref: "#/components/schemas/EventBase"
+        - type: object
+          properties:
+            type: { type: string, const: cheer_sent }
+            cheer: { type: string, enum: [bravo, super, seen] }
+          required: [type, cheer]
