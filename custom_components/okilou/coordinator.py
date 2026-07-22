@@ -72,9 +72,9 @@ class OkilouCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             except OkilouAuthError as err:
                 raise ConfigEntryAuthFailed(str(err)) from err
             except Exception as err:
-                # 409 « pas encore de règles » ou raté ponctuel : l'enfant
-                # reste listé, ses capteurs passeront indisponibles.
-                _LOGGER.debug("today(%s) : %s", child_id, err)
+                # 409 (pas encore de règles) ou raté ponctuel : l'enfant reste
+                # listé, ses capteurs passent indisponibles.
+                _LOGGER.warning("today(%s) : %s", child_id, err)
                 today = None
 
             data["children"][child_id] = {"info": child, "today": today}
@@ -88,7 +88,7 @@ class OkilouCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             try:
                 page = await self.client.events(child_id, since)
             except Exception as err:
-                _LOGGER.debug("events(%s) : %s", child_id, err)
+                _LOGGER.warning("events(%s) : %s", child_id, err)
                 continue
             for event in page.get("events", []):
                 # L'API ne fournit que childId, le prénom vient de /children.
