@@ -1,24 +1,23 @@
-# Spec OpenAPI de l'API publique Okilou v1. Servie sur okilou.fr/api/openapi.yaml
-# et publiée dans le repo okilou/okilou-homeassistant.
+# OpenAPI spec for the Okilou public API v1. Served at okilou.fr/api/openapi.yaml
+# and published in the okilou/okilou-homeassistant repository.
 openapi: 3.1.0
 info:
   title: Okilou API v1
   version: "1.0"
   description: |
-    API publique **en lecture seule** d'Okilou (https://okilou.fr). Un jeton
-    couvre **le foyer** (tous ses enfants), se crée dans l'app (Réglages →
-    Ton foyer → API & domotique) et se révoque à tout moment.
+    **Read-only** public API for Okilou (https://okilou.fr). One token covers
+    **the household** (all its children). Tokens are created in the app
+    (Settings → Your household → API & home automation) and can be revoked
+    at any time.
 
-    L'API n'expose que ce que le parent voit déjà dans l'app, rien de plus.
+    The API only exposes what the parent already sees in the app, nothing more.
 
-    **Garde alternée (mode indépendant)** : le jeton d'un foyer ne sert que
-    les journées de ce foyer. Le jour de l'autre maison, `/today` répond
-    calmement `{ date, isMyDay: false }`, jamais un 403, jamais les données
-    de l'autre foyer.
+    **Shared custody (independent mode)**: a household token only serves that
+    household's days. On the other home's days, `/today` responds with a calm
+    `{ date, isMyDay: false }`, never a 403, never the other household's data.
 
-    **Latence** : l'app synchronise en 4 s (push) / 60 s (pull), un fait
-    apparaît sur l'API dans les 30 à 60 s. **Rate-limit** : 30 requêtes/min
-    par jeton.
+    **Latency**: the app syncs within 4 s (push) / 60 s (pull), a fact shows
+    up on the API within 30 to 60 s. **Rate limit**: 30 requests/min per token.
   contact:
     name: Okilou
     url: https://okilou.fr/api/
@@ -26,17 +25,17 @@ servers:
   - url: https://api.okilou.com/functions/v1/api
     description: Production
   - url: https://wpicwejpjrpmjkprttmd.supabase.co/functions/v1/api
-    description: Production (URL d'origine, toujours valable)
+    description: Production (original URL, still valid)
 security:
   - bearerAuth: []
 paths:
   /children:
     get:
       operationId: listChildren
-      summary: Les enfants couverts par le jeton (le foyer)
+      summary: Children covered by the token (the household)
       responses:
         "200":
-          description: Liste des enfants.
+          description: List of children.
           content:
             application/json:
               schema:
@@ -48,14 +47,14 @@ paths:
   /children/{childId}/today:
     get:
       operationId: getToday
-      summary: L'état du jour calculé par le moteur (jauge, points, session)
+      summary: Today's state computed by the engine (gauge, points, session)
       parameters:
         - $ref: "#/components/parameters/childId"
       responses:
         "200":
           description: >
-            État du jour, ou réponse calme `{ date, isMyDay: false }` quand la
-            journée appartient à l'autre foyer (garde alternée indépendante).
+            Today's state, or a calm `{ date, isMyDay: false }` when the day
+            belongs to the other household (independent shared custody).
           content:
             application/json:
               schema:
@@ -64,12 +63,12 @@ paths:
                   - $ref: "#/components/schemas/CalmDay"
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403":
-          description: Enfant hors du cercle du jeton.
+          description: Child not covered by this token.
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
         "409":
-          description: Pas encore de règles synchronisées pour cet enfant.
+          description: No rules synced for this child yet.
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
@@ -77,13 +76,13 @@ paths:
   /children/{childId}/events:
     get:
       operationId: listEvents
-      summary: Les faits du journal (déclencheurs d'automatisations)
+      summary: Journal facts (automation triggers)
       description: |
-        Retourne au plus 100 événements par page, du plus ancien au plus
-        récent. Repasser le `cursor` renvoyé en `since` pour ne recevoir que
-        le nouveau. Le curseur est **composite** (`recorded_at,id`) et opaque :
-        le stocker et le repasser tel quel. Types servis : validations,
-        démarrages de session, récompenses à la carte, bravos.
+        Returns at most 100 events per page, oldest first. Pass the returned
+        `cursor` back as `since` to only receive new events. The cursor is
+        **composite** (`recorded_at,id`) and opaque: store it and pass it back
+        as is. Served types: validations, session starts, one-off rewards,
+        cheers.
       parameters:
         - $ref: "#/components/parameters/childId"
         - name: since
@@ -92,22 +91,22 @@ paths:
           schema:
             type: string
           description: >
-            Le `cursor` de la page précédente (ou un ISO 8601 pour démarrer à
-            un instant donné). Invalide → 400.
+            The `cursor` from the previous page (or an ISO 8601 timestamp to
+            start from a given instant). Invalid → 400.
       responses:
         "200":
-          description: Page d'événements + curseur.
+          description: Page of events + cursor.
           content:
             application/json:
               schema: { $ref: "#/components/schemas/EventsPage" }
         "400":
-          description: Paramètre `since` mal formé.
+          description: Malformed `since` parameter.
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403":
-          description: Enfant hors du cercle du jeton.
+          description: Child not covered by this token.
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
@@ -117,7 +116,7 @@ components:
     bearerAuth:
       type: http
       scheme: bearer
-      description: "Jeton de foyer `rf_api_` créé dans l'app Okilou."
+      description: "Household token `rf_api_` created in the Okilou app."
   parameters:
     childId:
       name: childId
@@ -128,12 +127,12 @@ components:
         format: uuid
   responses:
     Unauthorized:
-      description: Jeton manquant, inconnu ou révoqué.
+      description: Missing, unknown or revoked token.
       content:
         application/json:
           schema: { $ref: "#/components/schemas/Error" }
     RateLimited:
-      description: Trop de requêtes (max 30/min par jeton).
+      description: Too many requests (max 30/min per token).
       content:
         application/json:
           schema: { $ref: "#/components/schemas/Error" }
@@ -151,7 +150,7 @@ components:
       required: [id, firstName]
     CalmDay:
       type: object
-      description: Jour de l'autre foyer (garde indépendante), aucune donnée.
+      description: Day at the other household (independent custody), no data.
       properties:
         date: { type: string, format: date }
         isMyDay: { type: boolean, const: false }
@@ -164,14 +163,14 @@ components:
         period:
           type: string
           enum: [school, holiday, weekend]
-          description: Période effective du jour (zone scolaire du jeton).
+          description: Effective period for the day (school zone snapshotted on the token).
         points: { type: integer }
         maxPoints: { type: integer }
-        minutesUnlocked: { type: integer, description: "Minutes gagnées (jour ou semaine selon le rythme)." }
+        minutesUnlocked: { type: integer, description: "Minutes earned (per day or per week depending on the family's rhythm)." }
         minutesConsumed: { type: integer }
         minutesRemaining: { type: integer }
-        consumableToday: { type: boolean, description: "La consommation est-elle permise aujourd'hui ?" }
-        mandatoryOk: { type: boolean, description: "Les essentiels du jour sont-ils faits ?" }
+        consumableToday: { type: boolean, description: "Is consumption allowed today?" }
+        mandatoryOk: { type: boolean, description: "Are today's essentials done?" }
         perfect: { type: boolean }
         frozen: { type: boolean }
         joker: { type: boolean }
@@ -186,13 +185,13 @@ components:
             type: object
             properties:
               id: { type: string }
-              label: { type: string, description: "Libellé choisi par la famille (donnée utilisateur, jamais traduite)." }
+              label: { type: string, description: "Label chosen by the family (user data, never translated)." }
               status: { type: string, enum: [todo, declared, validated, rejected] }
               mandatory: { type: boolean }
             required: [id, label, status, mandatory]
         session:
           type: [object, "null"]
-          description: "Session de récompense. `endsAt` est connue dès le lancement, `minutes` est le cumul des lancements du jour."
+          description: "Reward session. `endsAt` is known as soon as the session starts, `minutes` is the day's cumulative started time."
           properties:
             running: { type: boolean }
             endsAt: { type: string, format: date-time }
@@ -210,7 +209,7 @@ components:
           items: { $ref: "#/components/schemas/ApiEvent" }
         cursor:
           type: [string, "null"]
-          description: "À repasser en `since` (opaque, composite `recorded_at,id`)."
+          description: "Pass back as `since` (opaque, composite `recorded_at,id`)."
       required: [events, cursor]
     ApiEvent:
       oneOf:
@@ -224,7 +223,7 @@ components:
       type: object
       properties:
         id: { type: string, format: uuid }
-        at: { type: string, format: date-time, description: "Horodatage serveur (recorded_at)." }
+        at: { type: string, format: date-time, description: "Server timestamp (recorded_at)." }
         day: { type: string, format: date }
         childId: { type: string, format: uuid }
       required: [id, at, day, childId]
@@ -243,7 +242,7 @@ components:
         - type: object
           properties:
             type: { type: string, const: session_started }
-            minutes: { type: integer, description: "0 si inconnu." }
+            minutes: { type: integer, description: "0 if unknown." }
           required: [type, minutes]
     MenuItemConsumed:
       allOf:

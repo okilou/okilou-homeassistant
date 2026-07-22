@@ -37,18 +37,18 @@ class OkilouApiClient:
             url, headers=headers, params=params, timeout=aiohttp.ClientTimeout(total=30)
         ) as resp:
             if resp.status == 401:
-                raise OkilouAuthError("jeton inconnu ou révoqué")
+                raise OkilouAuthError("unknown or revoked token")
             if resp.status == 429:
-                raise OkilouRateLimitError("trop de requêtes (max 30/min)")
+                raise OkilouRateLimitError("too many requests (max 30/min per token)")
             if resp.status >= 400:
                 body = await resp.text()
-                raise OkilouApiError(f"HTTP {resp.status} sur {path} : {body[:200]}")
+                raise OkilouApiError(f"HTTP {resp.status} on {path}: {body[:200]}")
             return await resp.json()
 
     @staticmethod
     def _check_id(child_id: str) -> str:
         if not UUID_RE.match(child_id):
-            raise OkilouApiError(f"identifiant enfant invalide : {child_id!r}")
+            raise OkilouApiError(f"invalid child id: {child_id!r}")
         return child_id
 
     async def children(self) -> list[dict[str, Any]]:
