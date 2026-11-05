@@ -1,29 +1,50 @@
-# Okilou pour Home Assistant
+# Okilou for Home Assistant
 
-[Okilou](https://okilou.fr) transforme les efforts du quotidien des enfants en
-récompenses convenues à l'avance. Cette intégration expose l'état du jour de
-chaque enfant dans Home Assistant et relaie les faits du journal sur le bus,
-en lecture seule : l'app reste le seul endroit où l'on valide.
+[Okilou](https://okilou.fr/?src=ha) is the neutral referee of the household: parents and children agree in advance on the conditions (homework done, room tidied) and on what they unlock (screen time, outings). This read-only integration exposes each child's day as sensors and relays new facts as events.
 
-*🇬🇧 English summary [below](#english-summary).*
+![Child device in Home Assistant](https://raw.githubusercontent.com/okilou/okilou-homeassistant/main/docs/device.png)
+
+**You need the Okilou app and an account.** The app is currently available in France and Switzerland (French, English and German). This is a cloud integration: Home Assistant polls the Okilou API every 60 seconds.
+
+- One **household token**, created and revocable in the app (Settings, Your household, API & home automation).
+- One **device per child**: remaining minutes, points, streak, running session (`ends_at` known at start), and a shared-custody "home today" sensor. On the other home's days, no data crosses over.
+- **`okilou_event`** bus events (`behavior_validated`, `session_started`, `menu_item_consumed`, `cheer_sent`) with `childId` and `childName`.
+- API spec: [`openapi.yaml`](openapi.yaml). Community clients welcome: open an issue and we will feature your project.
+
+Install: Settings, Marketplace, **Add from link**, paste this repository's URL. The setup starts right after the install, no restart needed. Then paste your token.
+
+---
+
+# En français
+
+Cette intégration expose l'état du jour de chaque enfant et relaie les faits du journal sur le bus, en lecture seule. L'app reste le seul endroit où l'on valide.
 
 - **Lecture seule** : l'intégration ne peut rien écrire ni valider.
 - **Un jeton par foyer**, créé et révocable dans l'app (Réglages → Ton foyer →
   API & domotique). Il couvre tous les enfants du foyer.
 - **Garde alternée** : le jour où l'enfant est dans son autre maison, les
   capteurs se mettent en veille. Aucune donnée de l'autre foyer ne transite.
-- Latence : l'app synchronise en 4 à 60 s, l'intégration interroge toutes les
-  60 s. Comptez 30 s à 2 min entre un geste dans l'app et sa trace ici.
+- **Service en ligne** : il faut l'app et un compte Okilou (disponible en France
+  et en Suisse). Latence : l'app synchronise en 4 à 60 s, l'intégration interroge
+  toutes les 60 s. Comptez 30 s à 2 min entre un geste dans l'app et sa trace ici.
 
 ## Installation
 
-### Via HACS (recommandé)
+### Via la Marketplace (Home Assistant 2026.11 et suivants)
 
-1. HACS → menu ⋮ → **Custom repositories** → ajouter
-   `https://github.com/okilou/okilou-homeassistant` (type *Integration*).
-2. Installer **Okilou**, redémarrer Home Assistant.
-3. Paramètres → Appareils et services → **Ajouter une intégration** → Okilou.
-4. Coller le **jeton du foyer** (`rf_api_…`) créé dans l'app.
+1. Paramètres → Marketplace → **Add from link** → coller
+   `https://github.com/okilou/okilou-homeassistant`. Home Assistant demande une
+   connexion GitHub pour cet ajout par lien.
+2. Installer **Okilou** : la configuration s'ouvre aussitôt, sans redémarrage.
+3. Coller le **jeton du foyer** (`rf_api_…`) créé dans l'app.
+
+[![Ouvrir Home Assistant pour configurer Okilou](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=okilou)
+
+### Avec HACS (avant 2026.11)
+
+HACS → menu ⋮ → **Custom repositories** → ajouter l'URL du dépôt (type
+*Integration*), installer **Okilou**, redémarrer, puis Paramètres → Appareils et
+services → **Ajouter une intégration** → Okilou.
 
 ### Manuellement
 
@@ -32,7 +53,9 @@ votre configuration, redémarrer, puis ajouter l'intégration.
 
 ## Ce que vous obtenez
 
-Un **appareil par enfant**, avec :
+Un **appareil par enfant**, avec les entités ci-dessous. Leur identifiant suit
+la langue de Home Assistant au moment de l'ajout (ici en français ; en anglais :
+`sensor.nino_reward_minutes_remaining`, `sensor.nino_session_ends`...).
 
 | Entité | Contenu |
 |---|---|
@@ -48,7 +71,7 @@ journal, pour déclencher vos automatisations :
 
 | `type` | Champs utiles | Quand |
 |---|---|---|
-| `behavior_validated` | `label`, `behaviorId` | un parent valide un effort |
+| `behavior_validated` | `label`, `behaviorId` | un parent valide une condition |
 | `session_started` | `minutes` | une session de récompense démarre |
 | `menu_item_consumed` | `label`, `menuItemId` | une récompense à la carte est utilisée |
 | `cheer_sent` | `cheer` (`bravo`/`super`/`seen`) | un parent envoie un bravo |
@@ -67,7 +90,7 @@ l'historique ; le curseur survit aux redémarrages de HA.
 
 ## Exemples
 
-Lumière verte 5 secondes quand un effort est validé :
+Lumière verte 5 secondes quand une condition est validée :
 
 ```yaml
 automation:
@@ -101,7 +124,7 @@ automation:
         target: { entity_id: tts.home }
         data:
           media_player_entity_id: media_player.salon
-          message: "C'est parti pour {{ trigger.event.data.minutes | default(0) }} minutes, bien mérité !"
+          message: "C'est parti pour {{ trigger.event.data.minutes | default(0) }} minutes !"
 ```
 
 L'attribut `ends_at` est connu dès le lancement, une automatisation peut donc
@@ -144,7 +167,7 @@ cards:
       - sensor.nino_serie_de_jours_reussis
 ```
 
-Plus de recettes : [okilou.fr/api](https://okilou.fr/api/).
+Plus de recettes : [okilou.fr/api](https://okilou.fr/api/?src=ha).
 
 ## Vie privée
 
@@ -159,23 +182,3 @@ L'API est ouverte, documentée ([`openapi.yaml`](openapi.yaml)) et gratuite en
 lecture. Un client Windows ou Linux, un plugin Jeedom, une carte Lovelace :
 si vous construisez quelque chose, ouvrez une issue et on référencera votre
 projet ici.
-
----
-
-## English summary
-
-Okilou ([okilou.fr](https://okilou.fr)) turns kids' everyday efforts into
-rewards agreed in advance. This integration is read-only: it exposes each
-child's day in Home Assistant and relays journal facts on the event bus. The
-app remains the only place where anything gets validated.
-
-- One **household token**, created and revocable in the app (Settings → Your
-  household → API & home automation).
-- One **device per child**: remaining reward minutes, points, streak, running
-  session (with `ends_at` known at start), and a shared-custody-aware
-  "home today" sensor. On the other parent's days, no data crosses over.
-- **`okilou_event`** bus events (`behavior_validated`, `session_started`,
-  `menu_item_consumed`, `cheer_sent`) with `childId` and `childName`.
-- Install via HACS custom repository, then add the integration and paste your
-  token. API spec: [`openapi.yaml`](openapi.yaml). Community clients welcome,
-  open an issue and we'll feature your project.

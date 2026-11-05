@@ -21,8 +21,8 @@ class OkilouChildEntity(CoordinatorEntity[OkilouCoordinator]):
             identifiers={(DOMAIN, child_id)},
             name=first_name,
             manufacturer="Okilou",
-            model="Profil enfant",
-            configuration_url="https://okilou.fr/api/",
+            model="Child profile",
+            configuration_url="https://okilou.fr/api/?src=ha",
         )
 
     @property

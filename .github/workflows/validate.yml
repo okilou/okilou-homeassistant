@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
   schedule:
     - cron: "0 4 * * 1" # lundi matin : attrape les dépréciations des releases HA
 
@@ -21,5 +22,3 @@ jobs:
       - uses: hacs/action@main
         with:
           category: integration
-          # brands : images embarquées dans l'intégration (Brands Proxy, HA 2026.3+)
-          ignore: brands
